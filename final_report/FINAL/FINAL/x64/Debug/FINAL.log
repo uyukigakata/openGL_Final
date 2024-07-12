@@ -1,0 +1,3 @@
+﻿  Final.c
+C:\Users\yuu\Document\KIT2024\前学期\computergrahics\final_report\FINAL\FINAL\Final.c(153,5): warning C4013: 関数 'glutMouseWheelFunc' は定義されていません。int 型の値を返す外部関数と見なします。
+  FINAL.vcxproj -> C:\Users\yuu\Document\KIT2024\前学期\computergrahics\final_report\FINAL\x64\Debug\FINAL.exe
