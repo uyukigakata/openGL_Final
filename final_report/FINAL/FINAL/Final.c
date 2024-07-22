@@ -1,12 +1,7 @@
-/* List: p3-planet.c
- * The planet turns around the sun.
- * Examination of world-local coordinates, modeling transfomation and
- * operation of matrix stack.
- */
 #include <stdlib.h>
 #include <GL/glut.h>
-#include <math.h>
-#include <stdbool.h>
+#include <windows.h>
+#include <stdio.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
