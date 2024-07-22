@@ -1,110 +1,259 @@
-#include <stdlib.h>
-#include <GL/glut.h>
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #include <stdio.h>
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
+#include <stdlib.h>
+#ifndef __APPLE__
+#include <GL/gl.h>
+#include <GL/glut.h>
+#else
+#include <OpenGL/gl.h>
+#include <GLUT/glut.h>
 #endif
 
-static int year = 0, day = 0;
-int samplingTime = 50;
-static double zoom = 1.0;
+#include <math.h>
+#include <GL/freeglut.h>
+
+
 static double cameraAngleX = 0.0;
 static double cameraAngleY = 0.0;
 static int mouseX, mouseY;
-static int isDragging = 0;
+static int isDragging = 0.0;
+static double zoom = 1.0f;
+static float Rotatex = -90.0f;
+static float Rotatey = 0.0f;
+static float Rotatez = 0.0f;
+static float objx = 0.0f;
+static float objy = 0.0f;
+static float objz = 0.0f;
+static float rotationAngle = 0.0f;
+static float movementStep = 0.1f; // ï¿½Ú“ï¿½ï¿½Xï¿½eï¿½bï¿½vï¿½Ì‘å‚«ï¿½ï¿½
+const float stages = 100.0f;
+static int textureStep = 0; // ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½Ìiï¿½ï¿½ï¿½iï¿½K
+
+#define imageWidth 256
+#define imageHeight 256
+
+//ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½}ï¿½bï¿½sï¿½ï¿½ï¿½Oï¿½ï¿½Lï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½é‚½ï¿½ß‚Ì‚ï¿½ï¿½ï¿½
+unsigned char texImage[imageHeight][imageWidth][3];//ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}
+unsigned char totyutexImage[imageHeight][imageWidth][3];//ï¿½}ï¿½ï¿½ï¿½}ï¿½Cï¿½ï¿½ï¿½O
+unsigned char totyutex2Image[imageHeight][imageWidth][3];//ï¿½}ï¿½ï¿½ï¿½}ï¿½Cï¿½ï¿½ï¿½O2
+unsigned char totyutex3Image[imageHeight][imageWidth][3];//ï¿½}ï¿½ï¿½ï¿½}ï¿½Cï¿½ï¿½ï¿½O3
+unsigned char sinkatexImage[imageHeight][imageWidth][3];//ï¿½}ï¿½ï¿½ï¿½}ï¿½Cï¿½ï¿½
+unsigned char stagetexImage[imageHeight][imageWidth][3];//ï¿½Xï¿½eï¿½[ï¿½W1
+
+GLuint textureID, totyutextureID, totyutexture2ID, 
+        totyusinkatextureID,sinkatextureID,stagetextureID;
+GLuint currentTextureID,currentStageID; // ï¿½ï¿½ï¿½İ‚ÌƒIï¿½uï¿½Wï¿½Fï¿½Nï¿½gï¿½Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½IDï¿½ï¿½Ûï¿½ï¿½ï¿½ï¿½ï¿½Ïï¿½
 
 
+//ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½}ï¿½bï¿½sï¿½ï¿½ï¿½Oï¿½É•Kï¿½vï¿½È‚ï¿½ï¿½ï¿½
+void readPPMImage(char* filename, unsigned char image[imageHeight][imageWidth][3])
+{
+    FILE* fp;
+    char header[3];
+    int width, height, maxval;
+
+    if (fopen_s(&fp, filename, "rb") != 0) {
+        fprintf(stderr, "Cannot open ppm file %s\n", filename);
+        exit(1);
+    }
+
+    fread(image, 1, imageWidth * imageHeight * 3, fp);    // read RGB data
+    fclose(fp);
+}
+//ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½}ï¿½bï¿½sï¿½ï¿½ï¿½Oï¿½É•Kï¿½vï¿½È‚ï¿½ï¿½ï¿½
+void setUpTexture(void)
+{
+    readPPMImage("ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}.ppm", texImage);
+    readPPMImage("ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}_ï¿½iï¿½ï¿½ï¿½rï¿½ï¿½2.ppm", totyutexImage);
+    readPPMImage("ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}_ï¿½iï¿½ï¿½ï¿½rï¿½ï¿½3.ppm", totyutex2Image);
+    readPPMImage("ï¿½}ï¿½ï¿½ï¿½}ï¿½Cï¿½ï¿½_ï¿½iï¿½ï¿½ï¿½rï¿½ï¿½.ppm", totyutex3Image);
+    readPPMImage("ï¿½}ï¿½ï¿½ï¿½}ï¿½Cï¿½ï¿½.ppm", sinkatexImage);
+    readPPMImage("ï¿½Åï¿½.ppm", stagetexImage);
+
+    // ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}ï¿½Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½İ’ï¿½
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, texImage);
+
+    // ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}ï¿½iï¿½ï¿½ï¿½rï¿½ï¿½ï¿½Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½İ’ï¿½
+    glGenTextures(1, &totyutextureID);
+    glBindTexture(GL_TEXTURE_2D, totyutextureID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, totyutexImage);
+
+    // ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}ï¿½Ìiï¿½ï¿½ï¿½rï¿½ï¿½2ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½İ’ï¿½
+    glGenTextures(1, &totyutexture2ID);
+    glBindTexture(GL_TEXTURE_2D, totyutexture2ID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, totyutex2Image);
+
+    // ï¿½}ï¿½ï¿½ï¿½}ï¿½Cï¿½ï¿½ï¿½Oï¿½Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½İ’ï¿½
+    glGenTextures(1, &totyusinkatextureID);
+    glBindTexture(GL_TEXTURE_2D, totyusinkatextureID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, totyutex3Image);
+
+    // ï¿½iï¿½ï¿½ï¿½`ï¿½Ô‚Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½İ’ï¿½
+    glGenTextures(1, &sinkatextureID);
+    glBindTexture(GL_TEXTURE_2D, sinkatextureID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, sinkatexImage);
+
+    // ï¿½Xï¿½eï¿½[ï¿½Wï¿½Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½İ’ï¿½
+    glGenTextures(1, &stagetextureID);
+    glBindTexture(GL_TEXTURE_2D, stagetextureID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, stagetexImage);
+
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô‚Æ‚ï¿½ï¿½Äƒrï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}ï¿½Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ï¿½İ’ï¿½
+    currentTextureID = textureID;
+    currentStageID = stagetextureID;
+}
+//ï¿½ï¿½ÊŠï¿½{ï¿½ï¿½ï¿½
 void myInit(char* progname)
 {
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);// ƒEƒBƒ“ƒhƒE‚Ì•\¦ƒ‚[ƒh‚ğİ’è
-    glutInitWindowSize(500, 500);// ƒEƒBƒ“ƒhƒE‚ÌƒTƒCƒY‚ğİ’è
-    glutInitWindowPosition(0, 0);// ƒEƒBƒ“ƒhƒE‚Ì‰ŠúˆÊ’u‚ğİ’è
-    glutCreateWindow(progname);// ƒEƒBƒ“ƒhƒE‚ğì¬‚µAƒEƒBƒ“ƒhƒE‚Ìƒ^ƒCƒgƒ‹‚ğprogname‚Éİ’è
-    glClearColor(0.0, 0.0, 0.0, 0.0);// ƒEƒBƒ“ƒhƒE‚ÌƒNƒŠƒAƒJƒ‰[i”wŒiFj‚ğİ’è
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);// ï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½Ì•\ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½hï¿½ï¿½İ’ï¿½
+    glutInitWindowSize(500, 500);// ï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½ÌƒTï¿½Cï¿½Yï¿½ï¿½İ’ï¿½
+    glutInitWindowPosition(0, 0);// ï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½Ìï¿½ï¿½ï¿½ï¿½Ê’uï¿½ï¿½İ’ï¿½
+    glutCreateWindow(progname);// ï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½ï¿½ï¿½ì¬ï¿½ï¿½ï¿½Aï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½Ìƒ^ï¿½Cï¿½gï¿½ï¿½ï¿½ï¿½prognameï¿½Éİ’ï¿½
+    
+    glClearColor(0.0, 0.5, 1,0);// ï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½ÌƒNï¿½ï¿½ï¿½Aï¿½Jï¿½ï¿½ï¿½[ï¿½iï¿½wï¿½iï¿½Fï¿½jï¿½ï¿½İ’ï¿½
+    glShadeModel(GL_SMOOTH);
+    glEnable(GL_DEPTH_TEST); // ï¿½[ï¿½xï¿½eï¿½Xï¿½gï¿½ï¿½Lï¿½ï¿½ï¿½É‚ï¿½ï¿½ï¿½
+    
 }
 
-void myDisplay(void)
+void mysetLight() {
+    float light_position[] = { 0.0, 10.0, 10.0, 1.0 }; // ï¿½ï¿½ï¿½ï¿½ï¿½ÌˆÊ’u4ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½fï¿½Bï¿½ï¿½ï¿½Nï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Cï¿½g 
+    float white[] = { 1.0, 1.0, 1.0, 1.0 }; /* ï¿½ï¿½ï¿½ÌF(RGB) */
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, white); /*ï¿½gï¿½Uï¿½ï¿½*/
+    glLightfv(GL_LIGHT0, GL_SPECULAR, white);/*ï¿½ï¿½ï¿½ÊŒï¿½*/
+    glEnable(GL_LIGHTING); /* ï¿½ï¿½ï¿½Cï¿½eï¿½Bï¿½ï¿½ï¿½Oï¿½ï¿½Lï¿½ï¿½ï¿½É‚ï¿½ï¿½ï¿½ */
+    glEnable(GL_LIGHT0); /* ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Lï¿½ï¿½ï¿½É‚ï¿½ï¿½ï¿½ */
+}
+//ï¿½ï¿½ï¿½Ì•\ï¿½ï¿½
+//void drawAxes(double length) {
+//    
+//    glBegin(GL_LINES);
+//    // X  
+//    glColor3d(1.0, 0.0, 0.0);
+//    glVertex3d(0.0, 0.0, 0.0);
+//    glVertex3d(length, 0.0, 0.0);
+//    // Y
+//    glColor3d(0.0, 1.0, 0.0);
+//    glVertex3d(0.0, 0.0, 0.0);
+//    glVertex3d(0.0, length, 0.0);
+//    // Z
+//    glColor3d(0.0, 0.0, 1.0);
+//    glVertex3d(0.0, 0.0, 0.0);
+//    glVertex3d(0.0, 0.0, length);
+//    glEnd();
+//}
+//ï¿½Iï¿½uï¿½Wï¿½Fï¿½Nï¿½gï¿½ï¿½ï¿½ï¿½
+void drawSphere(GLdouble radius) {
+    GLUquadric* quad = gluNewQuadric();
+    gluQuadricTexture(quad, GL_TRUE);  // ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½}ï¿½bï¿½sï¿½ï¿½ï¿½Oï¿½ï¿½Lï¿½ï¿½ï¿½É‚ï¿½ï¿½ï¿½
+    gluSphere(quad, radius, 32, 32);
+    gluDeleteQuadric(quad);
+}
+//ï¿½ï¿½ï¿½ï¿½
+void drawFace() {
+    glEnable(GL_TEXTURE_2D); // 2Dï¿½Lï¿½ï¿½ï¿½ï¿½
+    glBindTexture(GL_TEXTURE_2D, currentTextureID); // ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½}ï¿½bï¿½sï¿½ï¿½ï¿½O
+    glPushMatrix();
+    
+    mysetLight();
+    // ï¿½eï¿½ï¿½`ï¿½æ‚·ï¿½ï¿½
+    drawShadow();
+    // ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½Ìjï¿½Ì•`ï¿½ï¿½
+    glTranslated(objx,objy,objz);  // ï¿½Ê’uï¿½ï¿½{ï¿½Ì‚Ìï¿½É’ï¿½ï¿½ï¿½
+    glRotated(Rotatex, 1.0, 0.0, 0.0);  // xï¿½ï¿½ï¿½ï¿½90ï¿½xï¿½ï¿½]
+    glRotated(Rotatey, 0.0, 1.0, 0.0);  // zï¿½ï¿½ï¿½ï¿½0ï¿½xï¿½ï¿½]
+    glRotated(Rotatez, 0.0, 0.0, 1.0);  // zï¿½ï¿½ï¿½ï¿½0ï¿½xï¿½ï¿½]
+    drawSphere(0.7);              // ï¿½ï¿½ï¿½Ì‚ï¿½`ï¿½æ”¼ï¿½a0.7
+    //drawAxes(5.0);
+    glPopMatrix();
+    glDisable(GL_TEXTURE_2D); // 2Dï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½}ï¿½bï¿½sï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+}
+void drawShadow() {
+    // ï¿½eï¿½ï¿½ï¿½ï¿½ï¿½Éİ’è‚·ï¿½ï¿½
+    glColor3f(0.0, 0.0, 0.0);
+    glPushMatrix();
 
+    // ï¿½eï¿½ÌˆÊ’uï¿½ğ’²ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½ï¿½ï¿½Å‚Í‰Eï¿½ï¿½ï¿½É‰eï¿½ï¿½uï¿½ï¿½ï¿½j
+    glTranslated(objx + 0.5, objy, objz);
+    glRotated(Rotatex, 1.0, 0.0, 0.0);
+    glRotated(Rotatey, 0.0, 1.0, 0.0);
+    glRotated(Rotatez, 0.0, 0.0, 1.0);
+    drawSphere(0.7); // ï¿½eï¿½Æ‚ï¿½ï¿½Ä‹ï¿½ï¿½Ì‚ï¿½`ï¿½æ‚·ï¿½ï¿½
+    glPopMatrix();
+}
+
+void drawstage() {
+    glEnable(GL_TEXTURE_2D); // 2Dï¿½Lï¿½ï¿½ï¿½ï¿½
+    glBindTexture(GL_TEXTURE_2D, currentStageID); // ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½}ï¿½bï¿½sï¿½ï¿½ï¿½O
+    
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0, 0.0); 
+    glVertex3f(-stages, -0.7, -stages);
+    glTexCoord2f(1.0, 0.0); 
+    glVertex3f(stages, -0.7, -stages);
+    glTexCoord2f(1.0, 1.0); 
+    glVertex3f(stages, -0.7, stages);
+    glTexCoord2f(0.0, 0.0); 
+    glVertex3f(-stages, -0.7, stages);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+}
+void myDisplay(void)
 {
-    glClear(GL_COLOR_BUFFER_BIT);//‰Šúİ’è
-    glLoadIdentity();//ƒŠƒZƒbƒg
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();//ï¿½ï¿½ï¿½Zï¿½bï¿½g
+    // ï¿½Jï¿½ï¿½ï¿½ï¿½ï¿½Ì‰ï¿½]ï¿½ï¿½Kï¿½p
     gluLookAt(0.0, 2.0 * zoom, 5.0 * zoom,
         0.0, 0.0, 0.0,
         0.0, 1.0, 0.0);
     glRotated(cameraAngleY, 1.0, 0.0, 0.0);
     glRotated(cameraAngleX, 0.0, 1.0, 0.0);
-
-    // ÔF (‘¾—z)
+    //ï¿½ï¿½
     glPushMatrix();
-    glColor3d(1.0, 0.0, 0.0);
-    glRotated((double)day / 25.0, 0.0, 1.0, 0.0); // ©“]
-    glutWireSphere(1.0, 20, 16);   /* sun */
+    drawFace();
     glPopMatrix();
+    //ï¿½Xï¿½eï¿½[ï¿½W
+    drawstage();
 
-    
-
-    glPopMatrix();
 
     glutSwapBuffers();
-
 }
-
-void myReshape(int width, int height)
-{
-    // ƒrƒ…[ƒ|[ƒg‚ğİ’èBƒEƒBƒ“ƒhƒE‘S‘Ì‚ğƒrƒ…[ƒ|[ƒg‚Éİ’è,•,‚‚³
-    glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION); // s—ñƒ‚[ƒh‚ğ“Š‰es—ñ‚Éİ’è
-    glLoadIdentity();// ’PˆÊs—ñ‚ÉƒŠƒZƒbƒg
-    // “§‹“Š‰es—ñ‚ğİ’èB‹–ìŠp60“xAƒAƒXƒyƒNƒg”äA‹ß‚­‚Æ‰“‚­‚ÌƒNƒŠƒbƒsƒ“ƒO–Ê‚ğw’è
-    gluPerspective(60.0, (double)width / (double)height, 0.1, 120.0);
-    glMatrixMode(GL_MODELVIEW); // s—ñƒ‚[ƒh‚ğƒ‚ƒfƒ‹ƒrƒ…[s—ñ‚Éİ’è
-    glLoadIdentity();// ’PˆÊs—ñ‚ÉƒŠƒZƒbƒg
-    // ƒJƒƒ‰ˆÊ’u‚Æ‹“_‚ğİ’èBƒJƒƒ‰‚Í(0.0, 5.0, 15.0)‚É‚ ‚èAŒ´“_(0.0, 0.0, 0.0)‚ğŒ©‚Ä‚¢‚éB
-    // ã•ûŒü‚Í(0.0, 1.0, 0.0)
-    gluLookAt(0.0, 5.0, 40.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-}
-
-void myKeyboard(unsigned char key, int x, int y)
-{
-    switch (key) {
-    case 'd':
-        day = (day + 10);
-        glutPostRedisplay();
-        break;
-    case 'D':
-        day = (day - 10);
-        glutPostRedisplay();
-        break;
-    case 'y':
-        year = (year + 5);
-        glutPostRedisplay();
-        break;
-    case 'Y':
-        year = (year - 5);
-        glutPostRedisplay();
-        break;
-    case 27:
-        exit(0);
-        break;
-    default:
-        break;
-    }
-}
-
-void myTimer(int value)
-{
-    if (value == 1)
-    {
-        glutTimerFunc(samplingTime, myTimer, 1);
-        year = (year + 1);
-        day = (day + 5);
-
-        glutPostRedisplay();
-    }
-}
-
+//ï¿½}ï¿½Eï¿½Xï¿½Ì‰ï¿½ï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½ÅŒï¿½ï¿½oï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½Ú“ï¿½
 void myMouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON) {
         if (state == GLUT_DOWN) {
@@ -117,6 +266,7 @@ void myMouse(int button, int state, int x, int y) {
         }
     }
 }
+//ï¿½}ï¿½Eï¿½Xï¿½hï¿½ï¿½ï¿½bï¿½Oï¿½ÅˆÚ“ï¿½
 void myMouseMotion(int x, int y) {
     if (isDragging) {
         cameraAngleX += (x - mouseX) * 0.5;
@@ -126,6 +276,7 @@ void myMouseMotion(int x, int y) {
         glutPostRedisplay();
     }
 }
+//ï¿½}ï¿½Eï¿½Xï¿½zï¿½Cï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½kï¿½ï¿½
 void myMouseWheel(int button, int dir, int x, int y) {
     if (dir > 0) {
         zoom /= 1.1; // Zoom in
@@ -135,18 +286,105 @@ void myMouseWheel(int button, int dir, int x, int y) {
     }
     glutPostRedisplay();
 }
+//ï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½Yï¿½Ìƒï¿½ï¿½Tï¿½Cï¿½Y
+void myReshape(int width, int height)
+{
+    // ï¿½rï¿½ï¿½ï¿½[ï¿½|ï¿½[ï¿½gï¿½ï¿½İ’ï¿½Bï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½Sï¿½Ì‚ï¿½ï¿½rï¿½ï¿½ï¿½[ï¿½|ï¿½[ï¿½gï¿½Éİ’ï¿½,ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½
+    glViewport(0, 0, width, height);
+    glMatrixMode(GL_PROJECTION); // ï¿½sï¿½ñƒ‚[ï¿½hï¿½ğ“Š‰eï¿½sï¿½ï¿½Éİ’ï¿½
+    glLoadIdentity();// ï¿½Pï¿½Êsï¿½ï¿½Éƒï¿½ï¿½Zï¿½bï¿½g
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½eï¿½sï¿½ï¿½ï¿½İ’ï¿½Bï¿½ï¿½ï¿½ï¿½p60ï¿½xï¿½Aï¿½Aï¿½Xï¿½yï¿½Nï¿½gï¿½ï¿½Aï¿½ß‚ï¿½ï¿½Æ‰ï¿½ï¿½ï¿½ï¿½ÌƒNï¿½ï¿½ï¿½bï¿½sï¿½ï¿½ï¿½Oï¿½Ê‚ï¿½ï¿½wï¿½ï¿½
+    gluPerspective(60.0, (double)width / (double)height, 0.1, 120.0);
+    glMatrixMode(GL_MODELVIEW); // ï¿½sï¿½ñƒ‚[ï¿½hï¿½ï¿½ï¿½ï¿½ï¿½fï¿½ï¿½ï¿½rï¿½ï¿½ï¿½[ï¿½sï¿½ï¿½Éİ’ï¿½
+    glLoadIdentity();// ï¿½Pï¿½Êsï¿½ï¿½Éƒï¿½ï¿½Zï¿½bï¿½g
+    // ï¿½Jï¿½ï¿½ï¿½ï¿½ï¿½Ê’uï¿½Æï¿½ï¿½_ï¿½ï¿½İ’ï¿½Bï¿½Jï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(0.0, 5.0, 10.0)ï¿½É‚ï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½_(0.0, 0.0, 0.0)ï¿½ï¿½ï¿½ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½B
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(0.0, 1.0, 0.0)
+    gluLookAt(0.0, 5.0, 30.0, 0.0, 0.0, 0.0, 0.0, 20.0, 0.0);
+}
+void mykeyboard(unsigned char key, int x, int y) {
+    
+    switch (key)
+    {
+    case 'w':
+    case 'W': //ï¿½Oï¿½i
+        Rotatex -= 20.0;
+        objz -= 1.0;
+        glutPostRedisplay();
+        break;
+    case 's':
+    case 'S': //ï¿½ï¿½ï¿½
+        Rotatex += 20.0;
+        objz += 1.0;
+        glutPostRedisplay();
+        break;
+
+    case 'a':
+    case 'A': //ï¿½ï¿½ 
+        Rotatez -= 20.0;
+        objx -= 1.0f;
+        glutPostRedisplay();
+        break;
+
+    case 'd':
+    case 'D': //ï¿½E
+        Rotatez += 20.0;
+        objx += 1.0f;
+        glutPostRedisplay();
+        break;
+    default:
+        break;
+    }
+}
+//UIï¿½{ï¿½^ï¿½ï¿½ï¿½\ï¿½ï¿½
+void getValueFromMenu(int option) {
+    switch (option) {
+    case 1:
+        // ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}ï¿½iï¿½ï¿½ï¿½rï¿½ï¿½ï¿½Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ÉØ‚ï¿½Ö‚ï¿½ï¿½Ä‰ï¿½]
+        currentTextureID = totyutextureID;
+        glutPostRedisplay(); // ï¿½Ä•`ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½ï¿½Kï¿½[
+        break;
+    case 2:
+        // ï¿½rï¿½ï¿½ï¿½ï¿½ï¿½_ï¿½}ï¿½iï¿½ï¿½ï¿½rï¿½ï¿½2ï¿½Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ÉØ‚ï¿½Ö‚ï¿½ï¿½Ä‰ï¿½]
+        currentTextureID = totyutexture2ID;
+        glutPostRedisplay(); // ï¿½Ä•`ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½ï¿½Kï¿½[
+        break;
+    case 3:
+        // ï¿½iï¿½ï¿½ï¿½`ï¿½Ô‚Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ÉØ‚ï¿½Ö‚ï¿½ï¿½Ä‰ï¿½]
+        currentTextureID = totyusinkatextureID;
+        glutPostRedisplay(); // ï¿½Ä•`ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½ï¿½Kï¿½[
+        break;
+    case 4:
+        // ï¿½iï¿½ï¿½ï¿½`ï¿½Ô‚Ìƒeï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½ÉØ‚ï¿½Ö‚ï¿½ï¿½Ä‰ï¿½]
+        currentTextureID = sinkatextureID;
+        glutPostRedisplay(); // ï¿½Ä•`ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½ï¿½Kï¿½[
+        break;
+    default:
+        break;
+    }
+}
+//ï¿½ï¿½ï¿½jï¿½ï¿½ï¿½[ï¿½ì¬ï¿½A
+void mySetMenu() {
+    glutCreateMenu(getValueFromMenu);//ï¿½ï¿½ï¿½jï¿½ï¿½ï¿½[ï¿½İ’ï¿½
+    glutAddMenuEntry("evolution", 1);
+    glutAddMenuEntry("evolution2", 2);
+    glutAddMenuEntry("evolution3", 3);
+    glutAddMenuEntry("evolution4", 4);
+    glutAttachMenu(GLUT_RIGHT_BUTTON);
+}
+
 
 int main(int argc, char** argv)
 {
-    glutInit(&argc, argv);
-    myInit(argv[0]);
-    glutKeyboardFunc(myKeyboard);
-    glutTimerFunc(samplingTime, myTimer, 1);
-    glutReshapeFunc(myReshape);
-    glutMouseFunc(myMouse);
-    glutMotionFunc(myMouseMotion);
-    glutMouseWheelFunc(myMouseWheel);
-    glutDisplayFunc(myDisplay);
-    glutMainLoop();
+    glutInit(&argc, argv); // GLUTï¿½Ìï¿½ï¿½ï¿½ï¿½ï¿½
+    myInit(argv[0]); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öï¿½ï¿½ï¿½ï¿½Ä‚Ñoï¿½ï¿½
+    setUpTexture(); // ï¿½eï¿½Nï¿½Xï¿½`ï¿½ï¿½ï¿½Ìİ’ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½Öï¿½ï¿½ï¿½ï¿½Ä‚Ñoï¿½ï¿½
+    glutMouseFunc(myMouse); // ï¿½}ï¿½Eï¿½Xï¿½ï¿½ï¿½ìï¿½ÌƒRï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½Öï¿½ï¿½ï¿½ï¿½wï¿½ï¿½
+    glutMotionFunc(myMouseMotion); // ï¿½}ï¿½Eï¿½Xï¿½Ú“ï¿½ï¿½ï¿½ï¿½ÌƒRï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½Öï¿½ï¿½ï¿½ï¿½wï¿½ï¿½
+    glutMouseWheelFunc(myMouseWheel); // ï¿½}ï¿½Eï¿½Xï¿½zï¿½Cï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½ìï¿½ÌƒRï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½Öï¿½ï¿½ï¿½ï¿½wï¿½ï¿½
+    glutKeyboardFunc(mykeyboard); // ï¿½Lï¿½[ï¿½{ï¿½[ï¿½hï¿½ï¿½ï¿½ìï¿½ÌƒRï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½Öï¿½ï¿½ï¿½ï¿½wï¿½ï¿½iï¿½Rï¿½ï¿½ï¿½ï¿½ï¿½gï¿½Aï¿½Eï¿½gï¿½ï¿½ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½j
+    glutReshapeFunc(myReshape); // ï¿½Eï¿½Bï¿½ï¿½ï¿½hï¿½Eï¿½Ìƒï¿½ï¿½Tï¿½Cï¿½Yï¿½ï¿½ï¿½ÌƒRï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½Öï¿½ï¿½ï¿½ï¿½wï¿½ï¿½
+    glutDisplayFunc(myDisplay); // ï¿½`ï¿½æï¿½ÌƒRï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½Nï¿½Öï¿½ï¿½ï¿½ï¿½wï¿½ï¿½
+    mySetMenu(); // ï¿½ï¿½ï¿½jï¿½ï¿½ï¿½[ï¿½Ìİ’ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½Öï¿½ï¿½ï¿½ï¿½Ä‚Ñoï¿½ï¿½
+    glutMainLoop(); // GLUTï¿½Ìƒï¿½ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½vï¿½ï¿½ï¿½Jï¿½n
     return 0;
 }
